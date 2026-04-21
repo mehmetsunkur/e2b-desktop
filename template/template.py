@@ -2,7 +2,7 @@ from e2b import CopyItem, Template
 
 template = (
     Template(file_context_path="files")
-    .from_image("ubuntu:22.04")
+    .from_image("ubuntu:24.04")
     .set_user("root")
     .set_workdir("/")
     .set_envs(
@@ -32,13 +32,14 @@ template = (
             "curl",
             "git",
             "wget",
+            "gnupg",
             "python3-pip",
             "xdotool",
             "scrot",
             "ffmpeg",
             "x11vnc",
             "net-tools",
-            "netcat",
+            "netcat-openbsd",
             "x11-apps",
             "libreoffice",
             "xpdf",
@@ -52,7 +53,7 @@ template = (
             "libgtk-3-bin",
         ]
     )
-    .pip_install("numpy")
+    .run_cmd("pip3 install --break-system-packages numpy")
     # Setup NoVNC and websockify
     .git_clone(
         "https://github.com/e2b-dev/noVNC.git", "/opt/noVNC", branch="e2b-desktop"
@@ -66,23 +67,25 @@ template = (
     # Install browsers and set up repositories
     .run_cmd(
         [
-            "add-apt-repository ppa:mozillateam/ppa",
-            "wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -",
-            'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list',
-            "wget -qO- https://packages.microsoft.com/keys/microsoft.asc | apt-key add -",
-            'add-apt-repository -y "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main"',
+            "install -m 0755 -d /etc/apt/keyrings",
+            "wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg",
+            'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list',
+            "wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /etc/apt/keyrings/packages.microsoft.gpg",
+            'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list',
+            "add-apt-repository -y ppa:mozillateam/ppa",
+            "printf 'Package: firefox*\\nPin: release o=LP-PPA-mozillateam\\nPin-Priority: 1001\\n' > /etc/apt/preferences.d/mozilla-firefox",
             "apt-get update",
         ],
     )
     # Install browsers and VS Code
-    .apt_install(["firefox-esr", "google-chrome-stable", "code"])
+    .apt_install(["firefox", "google-chrome-stable", "code"])
     # Configure system settings
     .make_symlink(
         "/usr/bin/xfce4-terminal.wrapper",
         "/etc/alternatives/x-terminal-emulator",
         force=True,
     )
-    .run_cmd("update-alternatives --set x-www-browser /usr/bin/firefox-esr")
+    .run_cmd("update-alternatives --set x-www-browser /usr/bin/firefox")
     .make_dir("/home/user/.config/Code/User")
     .make_dir("/home/user/.config/xfce4/xfconf/xfce-perchannel-xml/")
     .make_dir("/home/user/.config/autostart")
@@ -112,13 +115,13 @@ template = (
             ),
             CopyItem(
                 src="firefox-policies.json",
-                dest="/usr/lib/firefox-esr/distribution/policies.json",
+                dest="/usr/lib/firefox/distribution/policies.json",
             ),
             CopyItem(
                 src="firefox-autoconfig.js",
-                dest="/usr/lib/firefox-esr/defaults/pref/autoconfig.js",
+                dest="/usr/lib/firefox/defaults/pref/autoconfig.js",
             ),
-            CopyItem(src="firefox.cfg", dest="/usr/lib/firefox-esr/firefox.cfg"),
+            CopyItem(src="firefox.cfg", dest="/usr/lib/firefox/firefox.cfg"),
         ]
     )
 )
